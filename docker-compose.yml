@@ -1,0 +1,30 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:-2.6.4}
+    container_name: techdistri-n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    environment:
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-Europe/Paris}
+      - TZ=${TZ:-Europe/Paris}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_FOLDER=${N8N_USER_FOLDER:-/home/node/.n8n}
+      - N8N_DEFAULT_BINARY_DATA_MODE=${N8N_DEFAULT_BINARY_DATA_MODE:-filesystem}
+      - EXECUTIONS_DATA_PRUNE=${EXECUTIONS_DATA_PRUNE:-true}
+      - EXECUTIONS_DATA_MAX_AGE=${EXECUTIONS_DATA_MAX_AGE:-168}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=${N8N_BLOCK_ENV_ACCESS_IN_NODE:-false}
+      - AIRTABLE_BASE_ID=${AIRTABLE_BASE_ID}
+      - AIRTABLE_CLIENTS_TABLE_ID=${AIRTABLE_CLIENTS_TABLE_ID}
+      - AIRTABLE_MAILS_TABLE_ID=${AIRTABLE_MAILS_TABLE_ID}
+      - AIRTABLE_FILES_TABLE_ID=${AIRTABLE_FILES_TABLE_ID}
+      - GOOGLE_DRIVE_CLIENTS_FOLDER_ID=${GOOGLE_DRIVE_CLIENTS_FOLDER_ID}
+      - GMAIL_LABEL_DONE_ID=${GMAIL_LABEL_DONE_ID}
+      - GMAIL_LABEL_ERROR_ID=${GMAIL_LABEL_ERROR_ID}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+
+volumes:
+  n8n_data:
+    name: techdistri_n8n_data

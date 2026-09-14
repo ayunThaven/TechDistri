@@ -1,0 +1,1228 @@
+{
+  "name": "WF01_Ingestion_Gmail_GED",
+  "nodes": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "Gmail toutes les 5 minutes",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        0
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "event": "messageReceived",
+        "simple": false,
+        "maxResults": 10,
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "filters": {
+          "q": "in:inbox",
+          "readStatus": "both",
+          "includeDrafts": false,
+          "includeSpamTrash": false
+        },
+        "options": {
+          "downloadAttachments": true,
+          "dataPropertyAttachmentsPrefixName": "attachment_"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL",
+          "name": "Gmail OAuth2 - techdistriesgi@gmail.com"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Normaliser email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst headerList = j.payload?.headers || [];\nconst headers = Object.fromEntries(headerList.map(h => [String(h.name).toLowerCase(), h.value]));\nconst headerText = (value) => {\n  if (typeof value === 'string') return value;\n  if (Array.isArray(value)) return value.map(headerText).find(Boolean) || '';\n  if (value && typeof value === 'object') {\n    const email = headerText(value.email || value.address || value.value || value.text || '');\n    const name = headerText(value.name || value.displayName || '');\n    return email ? (name ? name + ' <' + email + '>' : email) : '';\n  }\n  return '';\n};\nconst fromRaw = [j.from, j.From, j.headers?.from, headers.from].map(headerText).find(Boolean) || '';\nconst match = String(fromRaw).match(/^(.*?)<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,})>?$/i);\nconst senderEmail = (match?.[2] || fromRaw).trim().toLowerCase();\nconst senderName = (match?.[1] || '').replace(/[\"<>]/g, '').trim();\nconst domain = senderEmail.includes('@') ? senderEmail.split('@').pop() : 'inconnu.local';\nconst generic = /^(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|protonmail)\\./i.test(domain);\nconst clientKey = generic ? senderEmail : domain;\nconst baseName = generic ? senderEmail.split('@')[0] : domain.split('.')[0];\nconst clientName = baseName.replace(/[._-]+/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());\nconst folderSlug = clientKey.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9@._-]+/gi, '-').slice(0, 90);\nconst binaryKeys = Object.keys($binary || {});\nconst received = j.date || j.internalDate || j.headers?.date || headers.date || new Date().toISOString();\nconst receivedIso = /^\\d+$/.test(String(received)) ? new Date(Number(received)).toISOString() : new Date(received).toISOString();\nreturn { json: {\n  gmailId: j.id, threadId: j.threadId || '', rfcMessageId: j.headers?.['message-id'] || headers['message-id'] || '',\n  subject: j.subject || j.Subject || j.headers?.subject || headers.subject || '(sans objet)',\n  senderEmail, senderName, domain, clientKey, clientName, folderSlug, receivedIso,\n  bodyText: j.text || j.textPlain || j.snippet || '', attachmentCount: binaryKeys.length,\n  binaryKeys, processedAt: new Date().toISOString(), executionId: $execution.id\n}, binary: $binary };"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "name": "Chercher mail Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1120,
+        80
+      ],
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_MAILS_TABLE_ID}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "={{ \"{Gmail Message ID}='\" + $('Normaliser email').item.json.gmailId.replace(/'/g, \"\\\\'\") + \"'\" }}"
+            },
+            {
+              "name": "maxRecords",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Mail déjà connu ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -900,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.records || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "Ignorer doublon",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -680,
+        -40
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "Chercher client Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -680,
+        220
+      ],
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_CLIENTS_TABLE_ID}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "={{ \"{Identifiant client}='\" + $('Normaliser email').item.json.clientKey.replace(/'/g, \"\\\\'\") + \"'\" }}"
+            },
+            {
+              "name": "maxRecords",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "Client trouvé ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -440,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.records || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Contexte client existant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -180,
+        140
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c=$json.records[0]; const s=$('Normaliser email').item; return {json:{...s.json,clientRecordId:c.id,clientFolderId:c.fields['Dossier Drive ID']||''},binary:s.binary};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "Chercher dossier Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -180,
+        320
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"name='\" + $('Normaliser email').item.json.folderSlug.replace(/'/g, \"\\\\'\") + \"' and mimeType='application/vnd.google-apps.folder' and '\" + $env.GOOGLE_DRIVE_CLIENTS_FOLDER_ID + \"' in parents and trashed=false\" }}"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,webViewLink)"
+            },
+            {
+              "name": "pageSize",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_DRIVE_CREDENTIAL",
+          "name": "Google Drive OAuth2 - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Dossier trouvé ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        60,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.files || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Contexte dossier existant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        260
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s=$('Normaliser email').item; const f=$json.files[0]; return {json:{...s.json,clientFolderId:f.id,clientFolderUrl:f.webViewLink||('https://drive.google.com/drive/folders/'+f.id)},binary:s.binary};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Créer dossier Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        300,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({name:$('Normaliser email').item.json.folderSlug,mimeType:'application/vnd.google-apps.folder',parents:[$env.GOOGLE_DRIVE_CLIENTS_FOLDER_ID]}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_DRIVE_CREDENTIAL",
+          "name": "Google Drive OAuth2 - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "name": "Contexte dossier créé",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s=$('Normaliser email').item; return {json:{...s.json,clientFolderId:$json.id,clientFolderUrl:$json.webViewLink||('https://drive.google.com/drive/folders/'+$json.id)},binary:s.binary};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000014",
+      "name": "Préparer requête Client",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {json:{...$json,airtableClientPayload:{records:[{fields:{'Nom client':$json.clientName,'Identifiant client':$json.clientKey,'Dossier Drive ID':$json.clientFolderId}}]}}};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "name": "Créer client Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        840,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_CLIENTS_TABLE_ID}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.airtableClientPayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000016",
+      "name": "Contexte client créé",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s=$('Normaliser email').item; const f=$('Créer client Airtable').item.json.records[0].fields; return {json:{...s.json,clientRecordId:$json.records[0].id,clientFolderId:f['Dossier Drive ID']},binary:s.binary};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000017",
+      "name": "Préparer requête Mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {json:{...$json,airtableMailPayload:{records:[{fields:{'Gmail Message ID':$json.gmailId,'Client':[$json.clientRecordId],'Sujet':$json.subject,'Expéditeur':$json.senderEmail,'Date réception':$json.receivedIso,'Corps texte':$json.bodyText,'Statut':'EN_COURS','Détail erreur':''}}]}}};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000018",
+      "name": "Créer mail Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1260,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_MAILS_TABLE_ID}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.airtableMailPayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000019",
+      "name": "Préparer pièces jointes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().flatMap((item,index)=>{const s=$('Normaliser email').all()[index]||item; const m=item.json.records?.[0] || {id:item.json.mailRecordId,fields:{Client:[item.json.clientRecordId],'Dossier Drive ID':item.json.clientFolderId}}; const folder=m.fields['Dossier Drive ID']; const keys=Object.keys(s.binary||{}); if(!keys.length) return [{json:{...s.json,mailRecordId:m.id,clientRecordId:m.fields.Client[0],clientFolderId:folder,hasAttachment:false}}]; return keys.map((k,i)=>{const b=s.binary[k]; const original=b.fileName||('piece-jointe-'+(i+1)); const safe=original.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-120); const stamp=s.json.receivedIso.replace(/[-:]/g,'').replace('T','_').slice(0,13); const archived=stamp+'_'+s.json.gmailId.slice(-10)+'_'+safe; return {json:{...s.json,mailRecordId:m.id,clientRecordId:m.fields.Client[0],clientFolderId:folder,hasAttachment:true,binaryKey:k,originalName:original,archivedName:archived,fileKey:s.json.gmailId+'::'+k,mimeType:b.mimeType||'application/octet-stream',fileSize:Number(b.fileSize||0),extension:(original.split('.').pop()||'').toLowerCase()},binary:{data:b}};});});"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000020",
+      "name": "Avec pièce jointe ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1740,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasAttachment }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "name": "Terminer mail sans PJ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1980,
+        20
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_MAILS_TABLE_ID}}/{{$json.mailRecordId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({fields:{Statut:'TERMINE','Détail erreur':''}}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "name": "Préparer requête Fichier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        260
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {json:{...$json,airtableFilePayload:{records:[{fields:{'Identifiant fichier':$json.fileKey,'Nom fichier':$json.originalName,'Mail':[$json.mailRecordId],'Mail Gmail ID':$json.gmailId,'Statut upload':'A_UPLOADER','Détail erreur':''}}]}}};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000023",
+      "name": "Créer fiche Fichier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2040,
+        260
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.airtableFilePayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000024",
+      "name": "Restaurer binaire",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        260
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const a=$('Préparer pièces jointes').item; return {json:{...a.json,fileRecordId:$json.records[0].id},binary:a.binary};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000025",
+      "name": "Uploader vers Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2460,
+        260
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "upload",
+        "inputDataFieldName": "data",
+        "name": "={{ $json.archivedName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.clientFolderId }}"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_DRIVE_CREDENTIAL",
+          "name": "Google Drive OAuth2 - TechDistri"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000026",
+      "name": "Upload réussi ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2700,
+        260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ Boolean($json.id) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000027",
+      "name": "Fichier uploadé",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2940,
+        180
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}/{{$('Restaurer binaire').item.json.fileRecordId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({fields:{'Statut upload':'UPLOADE','URL Drive':$json.webViewLink||('https://drive.google.com/file/d/'+$json.id+'/view'),'Détail erreur':''}}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000028",
+      "name": "Fichier en erreur",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2940,
+        340
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}/{{$('Restaurer binaire').item.json.fileRecordId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({fields:{'Statut upload':'ERREUR','Détail erreur':String($json.error?.message||$json.message||'Échec upload Google Drive').slice(0,900)}}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000029",
+      "name": "Lister fichiers du mail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3180,
+        260
+      ],
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "={{ \"{Mail Gmail ID}='\" + $('Restaurer binaire').item.json.gmailId.replace(/'/g, \"\\\\'\") + \"'\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "name": "Calculer statut mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3420,
+        260
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rows=$json.records||[]; const statuses=rows.map(r=>r.fields['Statut upload']); const pending=statuses.filter(s=>s==='A_UPLOADER').length; const ok=statuses.filter(s=>s==='UPLOADE').length; const errors=statuses.filter(s=>s==='ERREUR').length; const status=pending?'EN_COURS':errors?(ok?'PARTIEL':'ERREUR'):'TERMINE'; const a=$('Restaurer binaire').item.json; return {json:{gmailId:a.gmailId,mailRecordId:a.mailRecordId,status,isFinal:pending===0,detail:errors?errors+' fichier(s) en erreur':''}};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Mettre à jour statut mail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3660,
+        260
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_MAILS_TABLE_ID}}/{{$json.mailRecordId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({fields:{Statut:$json.status,'Détail erreur':$json.detail}}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000032",
+      "name": "Libeller Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3900,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/{{ $('Calculer statut mail').isExecuted ? $('Calculer statut mail').item.json.gmailId : $('Préparer pièces jointes').item.json.gmailId }}/modify",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({addLabelIds:[($('Calculer statut mail').isExecuted && ['PARTIEL','ERREUR'].includes($('Calculer statut mail').item.json.status))?$env.GMAIL_LABEL_ERROR_ID:$env.GMAIL_LABEL_DONE_ID],removeLabelIds:['UNREAD']}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL",
+          "name": "Gmail OAuth2 - techdistriesgi@gmail.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail toutes les 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Normaliser email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser email": {
+      "main": [
+        [
+          {
+            "node": "Chercher mail Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher mail Airtable": {
+      "main": [
+        [
+          {
+            "node": "Mail déjà connu ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mail déjà connu ?": {
+      "main": [
+        [
+          {
+            "node": "Ignorer doublon",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chercher client Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher client Airtable": {
+      "main": [
+        [
+          {
+            "node": "Client trouvé ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client trouvé ?": {
+      "main": [
+        [
+          {
+            "node": "Contexte client existant",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chercher dossier Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher dossier Drive": {
+      "main": [
+        [
+          {
+            "node": "Dossier trouvé ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dossier trouvé ?": {
+      "main": [
+        [
+          {
+            "node": "Contexte dossier existant",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Créer dossier Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Créer dossier Drive": {
+      "main": [
+        [
+          {
+            "node": "Contexte dossier créé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexte dossier existant": {
+      "main": [
+        [
+          {
+            "node": "Préparer requête Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexte dossier créé": {
+      "main": [
+        [
+          {
+            "node": "Préparer requête Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer requête Client": {
+      "main": [
+        [
+          {
+            "node": "Créer client Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Créer client Airtable": {
+      "main": [
+        [
+          {
+            "node": "Contexte client créé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexte client existant": {
+      "main": [
+        [
+          {
+            "node": "Préparer requête Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexte client créé": {
+      "main": [
+        [
+          {
+            "node": "Préparer requête Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer requête Mail": {
+      "main": [
+        [
+          {
+            "node": "Créer mail Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Créer mail Airtable": {
+      "main": [
+        [
+          {
+            "node": "Préparer pièces jointes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer pièces jointes": {
+      "main": [
+        [
+          {
+            "node": "Avec pièce jointe ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avec pièce jointe ?": {
+      "main": [
+        [
+          {
+            "node": "Préparer requête Fichier",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Terminer mail sans PJ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Terminer mail sans PJ": {
+      "main": [
+        [
+          {
+            "node": "Libeller Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer requête Fichier": {
+      "main": [
+        [
+          {
+            "node": "Créer fiche Fichier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Créer fiche Fichier": {
+      "main": [
+        [
+          {
+            "node": "Restaurer binaire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restaurer binaire": {
+      "main": [
+        [
+          {
+            "node": "Uploader vers Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uploader vers Drive": {
+      "main": [
+        [
+          {
+            "node": "Upload réussi ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload réussi ?": {
+      "main": [
+        [
+          {
+            "node": "Fichier uploadé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fichier en erreur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fichier uploadé": {
+      "main": [
+        [
+          {
+            "node": "Lister fichiers du mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fichier en erreur": {
+      "main": [
+        [
+          {
+            "node": "Lister fichiers du mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lister fichiers du mail": {
+      "main": [
+        [
+          {
+            "node": "Calculer statut mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer statut mail": {
+      "main": [
+        [
+          {
+            "node": "Mettre à jour statut mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mettre à jour statut mail": {
+      "main": [
+        [
+          {
+            "node": "Libeller Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "versionId": "00000000-0000-4000-8000-000000000033",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": []
+}

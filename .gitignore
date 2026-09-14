@@ -1,0 +1,6 @@
+.env
+.n8n-data/
+build/
+tmp/
+*.log
+
