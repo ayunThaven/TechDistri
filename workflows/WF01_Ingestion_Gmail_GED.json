@@ -311,7 +311,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({name:$('Normaliser email').item.json.folderSlug,mimeType:'application/vnd.google-apps.folder',parents:[$env.GOOGLE_DRIVE_CLIENTS_FOLDER_ID]}) }}",
+        "jsonBody": "={{ {name:$('Normaliser email').item.json.folderSlug,mimeType:'application/vnd.google-apps.folder',parents:[$env.GOOGLE_DRIVE_CLIENTS_FOLDER_ID]} }}",
         "options": {
           "response": {
             "response": {
@@ -373,7 +373,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.airtableClientPayload) }}",
+        "jsonBody": "={{ $json.airtableClientPayload }}",
         "options": {
           "response": {
             "response": {
@@ -435,7 +435,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.airtableMailPayload) }}",
+        "jsonBody": "={{ $json.airtableMailPayload }}",
         "options": {
           "response": {
             "response": {
@@ -514,7 +514,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({fields:{Statut:'TERMINE','Détail erreur':''}}) }}",
+        "jsonBody": "{\"fields\": {\"Statut\": \"TERMINE\", \"Détail erreur\": \"\"}}",
         "options": {
           "response": {
             "response": {
@@ -562,7 +562,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.airtableFilePayload) }}",
+        "jsonBody": "={{ $json.airtableFilePayload }}",
         "options": {
           "response": {
             "response": {
@@ -679,7 +679,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({fields:{'Statut upload':'UPLOADE','URL Drive':$json.webViewLink||('https://drive.google.com/file/d/'+$json.id+'/view'),'Détail erreur':''}}) }}",
+        "jsonBody": "={{ {fields:{\"Statut upload\":\"UPLOADE\",\"URL Drive\":$json.webViewLink||(\"https://drive.google.com/file/d/\"+$json.id+\"/view\"),\"Détail erreur\":\"\" } } }}",
         "options": {
           "response": {
             "response": {
@@ -713,7 +713,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({fields:{'Statut upload':'ERREUR','Détail erreur':String($json.error?.message||$json.message||'Échec upload Google Drive').slice(0,900)}}) }}",
+        "jsonBody": "={{ {fields:{\"Statut upload\":\"ERREUR\",\"Détail erreur\":String($json.error?.message||$json.message||\"Échec upload Google Drive\").slice(0,900)} } }}",
         "options": {
           "response": {
             "response": {
@@ -792,7 +792,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({fields:{Statut:$json.status,'Détail erreur':$json.detail}}) }}",
+        "jsonBody": "={{ {fields:{Statut:$json.status,\"Détail erreur\":$json.detail} } }}",
         "options": {
           "response": {
             "response": {
@@ -826,7 +826,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({addLabelIds:[($('Calculer statut mail').isExecuted && ['PARTIEL','ERREUR'].includes($('Calculer statut mail').item.json.status))?$env.GMAIL_LABEL_ERROR_ID:$env.GMAIL_LABEL_DONE_ID],removeLabelIds:['UNREAD']}) }}",
+        "jsonBody": "={{ {addLabelIds:[($('Calculer statut mail').isExecuted && ['PARTIEL','ERREUR'].includes($('Calculer statut mail').item.json.status))?$env.GMAIL_LABEL_ERROR_ID:$env.GMAIL_LABEL_DONE_ID],removeLabelIds:['UNREAD']} }}",
         "options": {
           "response": {
             "response": {
