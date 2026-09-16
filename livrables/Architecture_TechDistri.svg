@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="820" viewBox="0 0 1800 820" role="img" aria-labelledby="title desc">
   <title id="title">Architecture GED TechDistri niveau 2</title>
   <desc id="desc">Flux de Gmail vers n8n, Airtable, Google Drive et Airtable Interface.</desc>
   <defs>
@@ -7,16 +7,16 @@
       .title{font:700 46px Arial;fill:#111}.sub{font:20px Arial;fill:#5B616B}.box{fill:#EDEDED;stroke:#B8BCC4;stroke-width:2}.hot{fill:#6DCBF4;stroke:#3D8DFF;stroke-width:2}.h{font:700 28px Arial;fill:#111}.b{font:18px Arial;fill:#333}.arrow{stroke:#3D8DFF;stroke-width:8;marker-end:url(#arrow)}
     </style>
   </defs>
-  <rect width="1400" height="800" fill="#fff"/>
+  <rect width="1800" height="820" fill="#fff"/>
   <text x="70" y="85" class="title">GED TechDistri — architecture niveau 2</text>
   <text x="70" y="125" class="sub">Boîte de démonstration : techdistriesgi@gmail.com · Polling toutes les 5 minutes</text>
-  <line x1="280" y1="350" x2="350" y2="350" class="arrow"/><line x1="560" y1="350" x2="630" y2="350" class="arrow"/><line x1="840" y1="350" x2="910" y2="350" class="arrow"/><line x1="1120" y1="350" x2="1190" y2="350" class="arrow"/>
-  <g transform="translate(70 255)"><rect width="210" height="190" rx="8" class="box"/><text x="28" y="62" class="h">Gmail</text><text x="28" y="105" class="b">Emails + pièces jointes</text><text x="28" y="140" class="b">Libellés de résultat</text></g>
-  <g transform="translate(350 255)"><rect width="210" height="190" rx="8" class="hot"/><text x="28" y="62" class="h">n8n local</text><text x="28" y="105" class="b">Déduplication</text><text x="28" y="140" class="b">Orchestration + erreurs</text></g>
-  <g transform="translate(630 255)"><rect width="210" height="190" rx="8" class="box"/><text x="28" y="62" class="h">Airtable</text><text x="28" y="105" class="b">Clients · Mails · Fichiers</text><text x="28" y="140" class="b">Relations + rollups</text></g>
-  <g transform="translate(910 255)"><rect width="210" height="190" rx="8" class="box"/><text x="28" y="62" class="h">Drive</text><text x="28" y="105" class="b">Un dossier par client</text><text x="28" y="140" class="b">Liens vers les fichiers</text></g>
-  <g transform="translate(1190 255)"><rect width="170" height="190" rx="8" class="box"/><text x="22" y="62" class="h">Interface</text><text x="22" y="105" class="b">Recherche</text><text x="22" y="140" class="b">Lecture seule</text></g>
-  <rect x="350" y="540" width="770" height="110" rx="8" fill="#F7F7F7" stroke="#B8BCC4"/>
-  <text x="390" y="590" class="h">Principe de robustesse</text><text x="390" y="625" class="b">Un échec d’upload reste traçable dans Airtable sans bloquer les autres pièces jointes.</text>
+  <line x1="310" y1="360" x2="400" y2="360" class="arrow"/><line x1="670" y1="360" x2="750" y2="360" class="arrow"/><line x1="1020" y1="360" x2="1100" y2="360" class="arrow"/><line x1="1370" y1="360" x2="1450" y2="360" class="arrow"/>
+  <g transform="translate(60 250)"><rect width="250" height="220" rx="8" class="box"/><text x="28" y="62" class="h">Gmail</text><text x="28" y="108" class="b">Emails +</text><text x="28" y="135" class="b">pièces jointes</text><text x="28" y="177" class="b">Libellés de résultat</text></g>
+  <g transform="translate(400 250)"><rect width="270" height="220" rx="8" class="hot"/><text x="28" y="62" class="h">n8n local</text><text x="28" y="108" class="b">Déduplication</text><text x="28" y="145" class="b">Orchestration</text><text x="28" y="172" class="b">+ erreurs</text></g>
+  <g transform="translate(750 250)"><rect width="270" height="220" rx="8" class="box"/><text x="28" y="62" class="h">Airtable</text><text x="28" y="108" class="b">Clients · Mails</text><text x="28" y="135" class="b">· Fichiers</text><text x="28" y="177" class="b">Relations + rollups</text></g>
+  <g transform="translate(1100 250)"><rect width="270" height="220" rx="8" class="box"/><text x="28" y="62" class="h">Drive</text><text x="28" y="108" class="b">Un dossier par client</text><text x="28" y="150" class="b">Liens vers les fichiers</text></g>
+  <g transform="translate(1450 250)"><rect width="270" height="220" rx="8" class="box"/><text x="28" y="62" class="h">Interface</text><text x="28" y="108" class="b">Recherche</text><text x="28" y="150" class="b">Lecture seule</text></g>
+  <rect x="400" y="565" width="970" height="110" rx="8" fill="#F7F7F7" stroke="#B8BCC4"/>
+  <text x="440" y="615" class="h">Principe de robustesse</text><text x="440" y="650" class="b">Un échec d’upload reste traçable dans Airtable sans bloquer les autres pièces jointes.</text>
   <text x="70" y="745" class="sub">Stack : n8n Community 2.6.4 · Airtable · Google Drive · Gmail</text>
 </svg>
