@@ -21,6 +21,10 @@ flowchart LR
 7. Le statut final devient `TERMINE`, `PARTIEL` ou `ERREUR`.
 8. Gmail est libellé et marqué comme lu.
 
+## Gestion d’erreur après création du mail
+
+Après le nœud `Créer mail Airtable`, les erreurs techniques sont toutes redirigées vers le nœud unique `Marquer mail en ERREUR`. Il met immédiatement le champ `Statut` du mail à `ERREUR` et enregistre le message technique dans `Détail erreur`. Une erreur d’upload Drive conserve en plus la fiche Fichier concernée avec le statut `ERREUR`.
+
 ## Règle de rapprochement
 
 - Domaine professionnel : toutes les adresses du domaine représentent le même client.

@@ -3,31 +3,42 @@
   "nodes": [
     {
       "id": "00000000-0000-4000-8000-000000000001",
-      "name": "Gmail toutes les 5 minutes",
-      "type": "n8n-nodes-base.gmailTrigger",
-      "typeVersion": 1,
+      "name": "Planification toutes les 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
         -1600,
         0
       ],
       "parameters": {
-        "authentication": "oAuth2",
-        "event": "messageReceived",
-        "simple": false,
-        "maxResults": 10,
-        "pollTimes": {
-          "item": [
+        "rule": {
+          "interval": [
             {
-              "mode": "everyX",
-              "value": 5,
-              "unit": "minutes"
+              "field": "minutes",
+              "minutesInterval": 5
             }
           ]
-        },
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Relever les mails Gmail en attente",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1440,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 100,
+        "simple": false,
         "filters": {
-          "q": "in:inbox",
+          "q": "in:inbox -label:GED/Traité -label:GED/Erreur",
           "readStatus": "both",
-          "includeDrafts": false,
           "includeSpamTrash": false
         },
         "options": {
@@ -43,7 +54,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000002",
+      "id": "00000000-0000-4000-8000-000000000003",
       "name": "Normaliser email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -57,7 +68,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000003",
+      "id": "00000000-0000-4000-8000-000000000004",
       "name": "Chercher mail Airtable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -92,7 +103,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000004",
+      "id": "00000000-0000-4000-8000-000000000005",
       "name": "Mail déjà connu ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -122,7 +133,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000005",
+      "id": "00000000-0000-4000-8000-000000000006",
       "name": "Ignorer doublon",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
@@ -133,7 +144,7 @@
       "parameters": {}
     },
     {
-      "id": "00000000-0000-4000-8000-000000000006",
+      "id": "00000000-0000-4000-8000-000000000007",
       "name": "Chercher client Airtable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -168,7 +179,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000007",
+      "id": "00000000-0000-4000-8000-000000000008",
       "name": "Client trouvé ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -198,7 +209,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000008",
+      "id": "00000000-0000-4000-8000-000000000009",
       "name": "Contexte client existant",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -212,7 +223,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000009",
+      "id": "00000000-0000-4000-8000-000000000010",
       "name": "Chercher dossier Drive",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -251,7 +262,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000010",
+      "id": "00000000-0000-4000-8000-000000000011",
       "name": "Dossier trouvé ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -281,7 +292,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000011",
+      "id": "00000000-0000-4000-8000-000000000012",
       "name": "Contexte dossier existant",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -295,7 +306,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000012",
+      "id": "00000000-0000-4000-8000-000000000013",
       "name": "Créer dossier Drive",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -311,7 +322,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ {name:$('Normaliser email').item.json.folderSlug,mimeType:'application/vnd.google-apps.folder',parents:[$env.GOOGLE_DRIVE_CLIENTS_FOLDER_ID]} }}",
+        "jsonBody": "={{ JSON.stringify({name:$('Normaliser email').item.json.folderSlug,mimeType:'application/vnd.google-apps.folder',parents:[$env.GOOGLE_DRIVE_CLIENTS_FOLDER_ID]}) }}",
         "options": {
           "response": {
             "response": {
@@ -329,7 +340,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000013",
+      "id": "00000000-0000-4000-8000-000000000014",
       "name": "Contexte dossier créé",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -343,7 +354,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000014",
+      "id": "00000000-0000-4000-8000-000000000015",
       "name": "Préparer requête Client",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -357,7 +368,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000015",
+      "id": "00000000-0000-4000-8000-000000000016",
       "name": "Créer client Airtable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -373,7 +384,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ $json.airtableClientPayload }}",
+        "jsonBody": "={{ JSON.stringify($json.airtableClientPayload) }}",
         "options": {
           "response": {
             "response": {
@@ -391,7 +402,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000016",
+      "id": "00000000-0000-4000-8000-000000000017",
       "name": "Contexte client créé",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -405,7 +416,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000017",
+      "id": "00000000-0000-4000-8000-000000000018",
       "name": "Préparer requête Mail",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -419,7 +430,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000018",
+      "id": "00000000-0000-4000-8000-000000000019",
       "name": "Créer mail Airtable",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -435,7 +446,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ $json.airtableMailPayload }}",
+        "jsonBody": "={{ JSON.stringify($json.airtableMailPayload) }}",
         "options": {
           "response": {
             "response": {
@@ -453,7 +464,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000019",
+      "id": "00000000-0000-4000-8000-000000000020",
       "name": "Préparer pièces jointes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -463,11 +474,12 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "return $input.all().flatMap((item,index)=>{const s=$('Normaliser email').all()[index]||item; const m=item.json.records?.[0] || {id:item.json.mailRecordId,fields:{Client:[item.json.clientRecordId],'Dossier Drive ID':item.json.clientFolderId}}; const folder=m.fields['Dossier Drive ID']; const keys=Object.keys(s.binary||{}); if(!keys.length) return [{json:{...s.json,mailRecordId:m.id,clientRecordId:m.fields.Client[0],clientFolderId:folder,hasAttachment:false}}]; return keys.map((k,i)=>{const b=s.binary[k]; const original=b.fileName||('piece-jointe-'+(i+1)); const safe=original.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-120); const stamp=s.json.receivedIso.replace(/[-:]/g,'').replace('T','_').slice(0,13); const archived=stamp+'_'+s.json.gmailId.slice(-10)+'_'+safe; return {json:{...s.json,mailRecordId:m.id,clientRecordId:m.fields.Client[0],clientFolderId:folder,hasAttachment:true,binaryKey:k,originalName:original,archivedName:archived,fileKey:s.json.gmailId+'::'+k,mimeType:b.mimeType||'application/octet-stream',fileSize:Number(b.fileSize||0),extension:(original.split('.').pop()||'').toLowerCase()},binary:{data:b}};});});"
-      }
+        "jsCode": "return $input.all().flatMap((item,index)=>{const s=$('Normaliser email').all()[index]||item; const context=$('Préparer requête Mail').all()[index]||item; const m=item.json.records?.[0] || {id:item.json.mailRecordId,fields:{Client:[context.json.clientRecordId]}}; const folder=m.fields['Dossier Drive ID']||context.json.clientFolderId||''; if(!folder) throw new Error('Dossier Drive client introuvable : upload annulé pour éviter la racine du Drive'); const keys=Object.keys(s.binary||{}); if(!keys.length) return [{json:{...s.json,mailRecordId:m.id,clientRecordId:m.fields.Client[0],clientFolderId:folder,hasAttachment:false},pairedItem:{item:index}}]; return keys.map((k,i)=>{const b=s.binary[k]; const original=b.fileName||('piece-jointe-'+(i+1)); const safe=original.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-120); const stamp=s.json.receivedIso.replace(/[-:]/g,'').replace('T','_').slice(0,13); const archived=stamp+'_'+s.json.gmailId.slice(-10)+'_'+safe; return {json:{...s.json,mailRecordId:m.id,clientRecordId:m.fields.Client[0],clientFolderId:folder,hasAttachment:true,binaryKey:k,originalName:original,archivedName:archived,fileKey:s.json.gmailId+'::'+k,mimeType:b.mimeType||'application/octet-stream',fileSize:Number(b.fileSize||0),extension:(original.split('.').pop()||'').toLowerCase()},binary:{data:b},pairedItem:{item:index}};});});"
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000020",
+      "id": "00000000-0000-4000-8000-000000000021",
       "name": "Avec pièce jointe ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -498,7 +510,7 @@
       }
     },
     {
-      "id": "00000000-0000-4000-8000-000000000021",
+      "id": "00000000-0000-4000-8000-000000000022",
       "name": "Terminer mail sans PJ",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -514,7 +526,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "{\"fields\": {\"Statut\": \"TERMINE\", \"Détail erreur\": \"\"}}",
+        "jsonBody": "{\"fields\":{\"Statut\":\"TERMINE\",\"Détail erreur\":\"\"}}",
         "options": {
           "response": {
             "response": {
@@ -529,10 +541,11 @@
           "id": "REPLACE_AIRTABLE_CREDENTIAL",
           "name": "Airtable PAT - TechDistri"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000022",
+      "id": "00000000-0000-4000-8000-000000000023",
       "name": "Préparer requête Fichier",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -543,10 +556,11 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "jsCode": "return {json:{...$json,airtableFilePayload:{records:[{fields:{'Identifiant fichier':$json.fileKey,'Nom fichier':$json.originalName,'Mail':[$json.mailRecordId],'Mail Gmail ID':$json.gmailId,'Statut upload':'A_UPLOADER','Détail erreur':''}}]}}};"
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000023",
+      "id": "00000000-0000-4000-8000-000000000024",
       "name": "Créer fiche Fichier",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -562,7 +576,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ $json.airtableFilePayload }}",
+        "jsonBody": "={{ JSON.stringify($json.airtableFilePayload) }}",
         "options": {
           "response": {
             "response": {
@@ -577,10 +591,11 @@
           "id": "REPLACE_AIRTABLE_CREDENTIAL",
           "name": "Airtable PAT - TechDistri"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000024",
+      "id": "00000000-0000-4000-8000-000000000025",
       "name": "Restaurer binaire",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -591,10 +606,11 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "jsCode": "const a=$('Préparer pièces jointes').item; return {json:{...a.json,fileRecordId:$json.records[0].id},binary:a.binary};"
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000025",
+      "id": "00000000-0000-4000-8000-000000000026",
       "name": "Uploader vers Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
@@ -629,91 +645,40 @@
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 3000,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000026",
-      "name": "Upload réussi ?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        2700,
-        260
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "leftValue": "={{ Boolean($json.id) }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ]
-        }
-      }
+      "onError": "continueErrorOutput"
     },
     {
       "id": "00000000-0000-4000-8000-000000000027",
-      "name": "Fichier uploadé",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
+      "name": "Préparer mise à jour fichier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        2940,
+        2680,
         180
       ],
       "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}/{{$('Restaurer binaire').item.json.fileRecordId}}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "contentType": "json",
-        "specifyBody": "json",
-        "jsonBody": "={{ {fields:{\"Statut upload\":\"UPLOADE\",\"URL Drive\":$json.webViewLink||(\"https://drive.google.com/file/d/\"+$json.id+\"/view\"),\"Détail erreur\":\"\" } } }}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": false,
-              "responseFormat": "json"
-            }
-          }
-        }
-      },
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "REPLACE_AIRTABLE_CREDENTIAL",
-          "name": "Airtable PAT - TechDistri"
-        }
+        "mode": "runOnceForEachItem",
+        "jsCode": "const source=$('Restaurer binaire').item.json; return {json:{...$json,fileRecordId:source.fileRecordId,airtableFileUpdatePayload:{fields:{'Statut upload':'UPLOADE','URL Drive':$json.webViewLink||('https://drive.google.com/file/d/'+$json.id+'/view'),'Détail erreur':''}}}};"
       }
     },
     {
       "id": "00000000-0000-4000-8000-000000000028",
-      "name": "Fichier en erreur",
+      "name": "Fichier uploadé",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2940,
-        340
+        2920,
+        180
       ],
       "parameters": {
         "method": "PATCH",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}/{{$('Restaurer binaire').item.json.fileRecordId}}",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}/{{$json.fileRecordId}}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ {fields:{\"Statut upload\":\"ERREUR\",\"Détail erreur\":String($json.error?.message||$json.message||\"Échec upload Google Drive\").slice(0,900)} } }}",
+        "jsonBody": "={{ JSON.stringify($json.airtableFileUpdatePayload) }}",
         "options": {
           "response": {
             "response": {
@@ -728,10 +693,60 @@
           "id": "REPLACE_AIRTABLE_CREDENTIAL",
           "name": "Airtable PAT - TechDistri"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "00000000-0000-4000-8000-000000000029",
+      "name": "Préparer erreur fichier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2680,
+        340
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const source=$('Restaurer binaire').item.json; const detail=String($json.error?.message||$json.message||'Échec upload Google Drive').slice(0,900); return {json:{...$json,fileRecordId:source.fileRecordId,airtableFileUpdatePayload:{fields:{'Statut upload':'ERREUR','Détail erreur':detail}}}};"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "name": "Fichier en erreur",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2920,
+        340
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_FILES_TABLE_ID}}/{{$json.fileRecordId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.airtableFileUpdatePayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
       "name": "Lister fichiers du mail",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -759,10 +774,11 @@
           "id": "REPLACE_AIRTABLE_CREDENTIAL",
           "name": "Airtable PAT - TechDistri"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000030",
+      "id": "00000000-0000-4000-8000-000000000032",
       "name": "Calculer statut mail",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -772,11 +788,12 @@
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const rows=$json.records||[]; const statuses=rows.map(r=>r.fields['Statut upload']); const pending=statuses.filter(s=>s==='A_UPLOADER').length; const ok=statuses.filter(s=>s==='UPLOADE').length; const errors=statuses.filter(s=>s==='ERREUR').length; const status=pending?'EN_COURS':errors?(ok?'PARTIEL':'ERREUR'):'TERMINE'; const a=$('Restaurer binaire').item.json; return {json:{gmailId:a.gmailId,mailRecordId:a.mailRecordId,status,isFinal:pending===0,detail:errors?errors+' fichier(s) en erreur':''}};"
-      }
+        "jsCode": "const rows=$json.records||[]; const statuses=rows.map(r=>r.fields['Statut upload']); const pending=statuses.filter(s=>s==='A_UPLOADER').length; const ok=statuses.filter(s=>s==='UPLOADE').length; const errors=statuses.filter(s=>s==='ERREUR').length; const status=pending?'EN_COURS':errors?(ok?'PARTIEL':'ERREUR'):'TERMINE'; const a=$('Restaurer binaire').item.json; const detail=errors?errors+' fichier(s) en erreur':''; return {json:{gmailId:a.gmailId,mailRecordId:a.mailRecordId,status,isFinal:pending===0,detail,airtableMailStatusPayload:{fields:{Statut:status,'Détail erreur':detail}}}};"
+      },
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "00000000-0000-4000-8000-000000000031",
+      "id": "00000000-0000-4000-8000-000000000033",
       "name": "Mettre à jour statut mail",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -792,7 +809,92 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ {fields:{Statut:$json.status,\"Détail erreur\":$json.detail} } }}",
+        "jsonBody": "={{ JSON.stringify($json.airtableMailStatusPayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_AIRTABLE_CREDENTIAL",
+          "name": "Airtable PAT - TechDistri"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000034",
+      "name": "Préparer libellé Gmail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3860,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const calculated=$('Calculer statut mail').isExecuted?$('Calculer statut mail').item.json:null; const source=calculated||$('Préparer pièces jointes').item.json; const failed=Boolean(calculated&&['PARTIEL','ERREUR'].includes(calculated.status)); return {json:{gmailId:source.gmailId,gmailLabelPayload:{addLabelIds:[failed?$env.GMAIL_LABEL_ERROR_ID:$env.GMAIL_LABEL_DONE_ID],removeLabelIds:['UNREAD']}}};"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000035",
+      "name": "Libeller Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4100,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/{{$json.gmailId}}/modify",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.gmailLabelPayload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL",
+          "name": "Gmail OAuth2 - techdistriesgi@gmail.com"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000036",
+      "name": "Marquer mail en ERREUR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3180,
+        620
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.AIRTABLE_MAILS_TABLE_ID}}/{{$json.mailRecordId || $('Créer mail Airtable').item.json.records[0].id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{\"fields\":{\"Statut\":\"ERREUR\",\"Détail erreur\":\"Erreur technique après la création du mail — consulter l’exécution n8n.\"}}",
         "options": {
           "response": {
             "response": {
@@ -808,44 +910,21 @@
           "name": "Airtable PAT - TechDistri"
         }
       }
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000032",
-      "name": "Libeller Gmail",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        3900,
-        120
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/{{ $('Calculer statut mail').isExecuted ? $('Calculer statut mail').item.json.gmailId : $('Préparer pièces jointes').item.json.gmailId }}/modify",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "contentType": "json",
-        "specifyBody": "json",
-        "jsonBody": "={{ {addLabelIds:[($('Calculer statut mail').isExecuted && ['PARTIEL','ERREUR'].includes($('Calculer statut mail').item.json.status))?$env.GMAIL_LABEL_ERROR_ID:$env.GMAIL_LABEL_DONE_ID],removeLabelIds:['UNREAD']} }}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": false,
-              "responseFormat": "json"
-            }
-          }
-        }
-      },
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "REPLACE_GMAIL_CREDENTIAL",
-          "name": "Gmail OAuth2 - techdistriesgi@gmail.com"
-        }
-      }
     }
   ],
   "connections": {
-    "Gmail toutes les 5 minutes": {
+    "Planification toutes les 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Relever les mails Gmail en attente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relever les mails Gmail en attente": {
       "main": [
         [
           {
@@ -1061,6 +1140,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1086,7 +1172,14 @@
       "main": [
         [
           {
-            "node": "Libeller Gmail",
+            "node": "Préparer libellé Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
             "type": "main",
             "index": 0
           }
@@ -1101,6 +1194,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1109,6 +1209,13 @@
         [
           {
             "node": "Restaurer binaire",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
             "type": "main",
             "index": 0
           }
@@ -1123,6 +1230,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1130,14 +1244,26 @@
       "main": [
         [
           {
-            "node": "Upload réussi ?",
+            "node": "Préparer mise à jour fichier",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Préparer erreur fichier",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Marquer mail en ERREUR",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Upload réussi ?": {
+    "Préparer mise à jour fichier": {
       "main": [
         [
           {
@@ -1145,7 +1271,11 @@
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Préparer erreur fichier": {
+      "main": [
         [
           {
             "node": "Fichier en erreur",
@@ -1163,6 +1293,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1171,6 +1308,13 @@
         [
           {
             "node": "Lister fichiers du mail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
             "type": "main",
             "index": 0
           }
@@ -1185,6 +1329,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1196,6 +1347,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1203,7 +1361,44 @@
       "main": [
         [
           {
+            "node": "Préparer libellé Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer libellé Gmail": {
+      "main": [
+        [
+          {
             "node": "Libeller Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Libeller Gmail": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Marquer mail en ERREUR",
             "type": "main",
             "index": 0
           }
@@ -1219,7 +1414,7 @@
     "saveDataSuccessExecution": "all",
     "saveManualExecutions": true
   },
-  "versionId": "00000000-0000-4000-8000-000000000033",
+  "versionId": "00000000-0000-4000-8000-000000000037",
   "meta": {
     "templateCredsSetupCompleted": false
   },
